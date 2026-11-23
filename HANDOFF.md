@@ -310,6 +310,7 @@ Copy the values from `design/scene-reference.html` (`dir=D` for play, `dir=E` fo
 
 ## 7. Languages (FR/EN)
 
+- The game opens in **English** by default, whatever the browser or system language.
 - The EN/FR toggle switches **everything**: interface, rules, card instructions, feedback, the how-to and the end screen. The choice is saved, and `<html lang>` is updated.
 - **Content from the Sheet:**
   - Grid words and ship words stay in English. That's what is being practised.
