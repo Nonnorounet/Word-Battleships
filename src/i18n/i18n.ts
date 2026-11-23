@@ -4,7 +4,9 @@ import type { Lang } from '../state/types';
 const dicts: Record<Lang, Strings> = { en, fr };
 const store = (k: string, v?: string) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { /* storage unavailable */ } return null; };
 
-let lang: Lang = (store('wb.lang') as Lang) || (navigator.language?.startsWith('fr') ? 'fr' : 'en');
+// English by default, whatever the browser language; a manual EN/FR choice is remembered.
+const saved = store('wb.lang');
+let lang: Lang = saved === 'fr' ? 'fr' : 'en';
 const listeners = new Set<() => void>();
 
 export const getLang = () => lang;
