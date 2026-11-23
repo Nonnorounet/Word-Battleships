@@ -41,7 +41,10 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           chmod +x gradlew
-          if [ -n "$ANDROID_KEYSTORE_PATH" ]; then ./gradlew assembleRelease; else ./gradlew assembleDebug; fi
+          TASK=assembleDebug; [ -n "$ANDROID_KEYSTORE_PATH" ] && TASK=assembleRelease
+          # Maven Central sometimes rate-limits shared runners (HTTP 429): retry with a pause
+          for i in 1 2 3; do ./gradlew $TASK --no-daemon && exit 0; echo "Build attempt $i failed, retrying in $((i*60)) s"; sleep $((i*60)); done
+          exit 1
       - name: Collect the APK
         run: |
           F=$(ls android/app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
