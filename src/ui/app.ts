@@ -104,6 +104,7 @@ function homeHtml() {
       <div class="box"><h2>${t('sameDevice')}</h2>
         <button class="btn big" data-do="local">${t('sameDevice')}</button></div>
     </div>
+    <p class="note" role="note">${icon.alert()}<span>${t('vpnWarning')}</span></p>
     ${ui.homeError ? `<p class="err" role="alert">${esc(ui.homeError)}</p>` : ''}
     ${session && session.status === 'connecting' ? `<p class="muted" role="status">${t('connecting')}</p>` : ''}
   </div></main>`;
