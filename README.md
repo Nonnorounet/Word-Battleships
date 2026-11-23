@@ -60,3 +60,9 @@ One-time setup:
 - **Signed APK (optional):** add the repository secrets `ANDROID_KEYSTORE_B64` (the keystore file in base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and `ANDROID_KEY_PASSWORD`. Without them the workflow builds a debug APK, which installs fine for classroom use.
 
 The full specification is in [HANDOFF.md](HANDOFF.md).
+
+## Licence
+
+Word Battleships is free for **non-commercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): personal use, study, and use by schools, charities and public bodies. Any commercial use, including in paid training, needs written permission from the author.
+
+Bundled libraries keep their own licences: three.js and PeerJS (MIT), and the fonts (SIL Open Font License).
