@@ -30,6 +30,8 @@ Files that come with this handoff:
   - Word pack: one of the packs in the Sheet.
   - Grammar focus: free text or a list, e.g. "Past simple". It is shown on every card.
   - Time to judge a sentence: 30 s – 3 min, default 1 min 30.
+  - When the judging time runs out: **Accept automatically** (default) | **Trainer decides**.
+  - Hint unlocks after: 1 | 2 | 3 hits on the same ship (default 2).
   - **Ship words:** Random from the pack | Each team chooses.
   - **Ship placement:** Random | Each team places.
   - Checkboxes:
@@ -57,7 +59,9 @@ Files that come with this handoff:
    - A sentence box.
    - One **bonus** question drawn at random, without repeats, from the pack's Challenges.
 3. **Send.** The sentence and the bonus answer go to the other device.
-4. **Judge.** The other team sees the sentence and taps **Accept** or **Reject** before the timer ends. When the timer runs out, the sentence is accepted (default; make this an option later if wanted).
+4. **Judge.** The other team sees the sentence and taps **Accept** or **Reject** before the timer ends. When the timer runs out, what happens depends on the Options setting:
+   - **Accept automatically** (default): the sentence is accepted.
+   - **Trainer decides:** the card stays open on both devices with "Waiting for the trainer". The host device shows **Trainer: Accept** and **Trainer: Reject** buttons; the trainer taps one.
    - **Rejected:** the shot is lost and the turn passes to the other team.
    - **Accepted:** the shot is fired.
 5. **Resolve the shot.**
@@ -70,10 +74,10 @@ Files that come with this handoff:
 7. **Guess a ship (optional).** After a hit, the attacker may guess the whole word of any ship that has at least one letter revealed.
    - Right: the ship sinks and scores +3.
    - Wrong: no penalty, and the turn ends.
-8. **Hint unlock.** After 2 hits on the same ship, the attacker sees that ship's hint.
+8. **Hint unlock.** After the number of hits set in Options (default 2) on the same ship, the attacker sees that ship's hint.
 9. **Next turn.** The turn always passes to the other team (keeps both teams busy).
 
-### Scoring (defaults, confirm with the trainer)
+### Scoring (confirmed by the trainer)
 | Event | Points |
 |---|---|
 | Hit | +1 |
@@ -136,11 +140,11 @@ interface Transport {
 ```
 
 Adapters:
-1. **`peer` (default for HTML/APK/EXE):** WebRTC through PeerJS.
+1. **`peer` (HTML/APK/EXE):** WebRTC through PeerJS.
    - The host registers the peer id `wordbattleships-<CODE>` on the free public PeerJS broker. The guest connects to that id. No server to run.
-   - **Risk:** some company networks block WebRTC (possibly at CNES or Thales sites). If the connection doesn't open within 10 s, show "Can't connect on this network" and offer adapter 2.
-2. **`firebase` (fallback):** Firebase Realtime Database on the free plan, with one node per game code. Needs a Firebase project, with its config in `src/config.ts` (not secret, but restrict the database rules to `games/$code`).
-3. **`room` (claude.ai artifact only):** the artifact's `room` capability, if the game is also published as an artifact.
+   - **Risk:** some company networks block WebRTC (possibly at CNES or Thales sites). If the connection doesn't open within 10 s, show "Can't connect on this network" and offer **Practice mode** (one device, two windows) instead.
+   - No Firebase fallback (trainer's decision, §10). Keep the `Transport` interface so another adapter can be added later if needed.
+2. **`room` (claude.ai artifact only):** the artifact's `room` capability, if the game is also published as an artifact.
 
 ### Rules for the shared state
 - The **host is the source of truth**.
@@ -166,7 +170,7 @@ Adapters:
 ├─ src/
 │  ├─ main.ts            app bootstrap, routing between screens
 │  ├─ state/             game rules, reducer, validation (pure, unit-tested)
-│  ├─ net/               Transport + peer/firebase/room adapters
+│  ├─ net/               Transport + peer/room adapters
 │  ├─ sheet/             CSV fetch + parse + pack validation
 │  ├─ scene/             three.js board (see §6)
 │  ├─ ui/                screens: options, fleet-setup, play, card, judge, end
@@ -194,7 +198,7 @@ Adapters:
 - **Body:** three columns, `340px | 1fr | 320px`.
   - **Shot log (left):** see §1.
   - **3D board (centre):** the enemy waters. On its top-right edge sit Zoom in, Zoom out and the **Show your own fleet** button. That button flips to your own waters, shown with the same scene, your full words and the enemy's hits in red.
-  - **Enemy fleet (right):** one row per ship, with letter tiles (revealed letters filled, the rest empty), "n letters", the hint or "Hint unlocks after 2 hits", and Sunk ships in red. Below it, the guess box.
+  - **Enemy fleet (right):** one row per ship, with letter tiles (revealed letters filled, the rest empty), "n letters", the hint or "Hint unlocks after n hits" (n from Options), and Sunk ships in red. Below it, the guess box.
 - **Bottom bar:** the selected cell and its words, a helper line and **Draw challenge card**. While a card is open, it shows "Challenge open" and the countdown instead.
 - **Challenge card:**
   - Centred over the board, rotated about −1.5°, max width 420 px.
@@ -367,10 +371,11 @@ All three workflows run on every tag `v*` and attach their output to the GitHub 
 - [ ] Turn flow:
   - [ ] The card appears.
   - [ ] The other team can accept or reject.
-  - [ ] The timer runs out correctly.
+  - [ ] The timer runs out correctly, in both modes (accept automatically, trainer decides).
   - [ ] A rejected sentence loses the shot.
   - [ ] Hits and misses resolve correctly, and sinks are detected both by hits and by a guess.
-  - [ ] The hint unlocks after 2 hits.
+  - [ ] The hint unlocks after the number of hits set in Options (1, 2 or 3).
+- [ ] When pairing fails within 10 s, the message offers Practice mode.
   - [ ] The score matches the table in §1.
 - [ ] Bonus answers are checked with the rules in §1 (case, articles, "Also accept").
 - [ ] The Sheet loads from its link. It fails clearly when the Sheet isn't public. The built-in Aerospace pack works offline.
@@ -382,10 +387,10 @@ All three workflows run on every tag `v*` and attach their output to the GitHub 
 
 ---
 
-## 10. Open questions for the trainer
+## 10. Trainer decisions (2026-11-23)
 
-1. Scoring: confirm the values in §1.
-2. Timer running out: accept automatically (current default) or let the trainer decide?
-3. Trainer view: should the trainer have a third device that sees both fleets and can override a judgement?
-4. Hint unlock: 2 hits, or fewer for beginners?
-5. If PeerJS is blocked at a client site, use the Firebase fallback? It needs a free Firebase project under your Google account.
+1. **Scoring:** keep the values in §1.
+2. **Timer running out:** a host option, "Accept automatically" (default) or "Trainer decides" (§1).
+3. **Trainer view:** yes, but in **v1.1**, not v1. A third device joins the game as the trainer, sees both fleets in full and can override any Accept/Reject. Not part of the v1 acceptance checklist.
+4. **Hint unlock:** a host option, 1, 2 or 3 hits, default 2 (§1).
+5. **Firebase fallback:** no. When PeerJS is blocked, use Practice mode (§3).
