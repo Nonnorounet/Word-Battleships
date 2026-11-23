@@ -131,6 +131,8 @@ textarea.input { padding: 10px 12px; resize: vertical; min-height: 72px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 22px; }
 .err { color: var(--hit); font-size: 13px; }
+.note { display: flex; align-items: flex-start; gap: 10px; margin: 20px 0 0; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); font-size: 14px; line-height: 1.5; }
+.note svg { flex: none; color: var(--hit); margin-top: 2px; }
 .toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 18px; z-index: 20; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
 
 /* setup */
