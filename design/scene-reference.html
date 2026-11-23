@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block}</style>
+<script src="https://unpkg.com/three@0.159.0/build/three.min.js"></script>
+<!-- Scene reference for Word Battleships. Open with ?dir=D&theme=dark (play), ?dir=D&theme=light, ?dir=E&theme=dark (fleet setup). Add &hl=1 to show the label highlight. -->
+</head><body>
+<script>
+const P = new URLSearchParams(location.search);
+const DIR = P.get('dir') || 'A', DARK = P.get('theme') === 'dark';
+const W = +P.get('w') || 1200, H = +P.get('h') || 800;
+const ROWS = ["The engineer","Our team","The satellite","The client","The pilot","I","The supplier","We","The test","My manager"];
+const COLS = ["launch","delay","check","design","approve","deliver","fail","update","measure","schedule"];
+const LET = "ABCDEFGHIJ";
+
+const TH = {
+  D: !DARK ? {bg:0xf3efe2, water:0xf8f2e4, grid:0x1d5c4a, label:'#183f33', sub:'#3f5f50', hull:0x7d8a84, tile:'#c2410c', tileInk:'#ffffff', hit:0xc2410c, miss:0x1d5c4a, sunk:0x9a2a1d} : {bg:0x04100c, water:0x0b2e26, grid:0x2fe39a, label:'#b8f2d8', sub:'#5fbf96', hull:0x5a6a66, tile:'#ffb020', tileInk:'#04100c', hit:0xffb020, miss:0x9ff5cf, sunk:0xff6b5a},
+  A: DARK ? {bg:0x0b1622, water:0x12324a, grid:0x5fa8d3, label:'#cfe6f5', sub:'#7fa6c2', hull:0x8a96a3, deck:0x2b3440, tile:'#f2efe6', tileInk:'#14202b', hit:0xff5a3c, miss:0xe8f1f7}
+          : {bg:0xe8f2f7, water:0x6fb6d6, grid:0xffffff, label:'#0f2a3d', sub:'#4a6b80', hull:0x5d6b78, deck:0x3a4552, tile:'#fffaf0', tileInk:'#16232e', hit:0xe23d1f, miss:0xffffff},
+  B: DARK ? {bg:0x04100c, disc:0x062419, grid:0x2fe39a, label:'#9ff5cf', sub:'#3fae80', hit:0xffb020, miss:0x2fe39a, glyph:'#ffd27a'}
+          : {bg:0xf3efe2, disc:0xe9e1c8, grid:0x1d5c4a, label:'#183f33', sub:'#5c7a6c', hit:0xc0392b, miss:0x1d5c4a, glyph:'#9a2a1d'},
+  C: DARK ? {bg:0x17120e, table:0x3b2a1f, board:0x1f3d6b, boardTop:0x274b80, hole:0x0d1a2e, label:'#f1e6d2', sub:'#c9b79a', hull:0x9aa3ab, tile:'#f7f1e3', tileInk:'#1c2430', hit:0xe8402a, miss:0xf4f4f4}
+          : {bg:0xf4ede2, table:0xc79a6b, board:0x2a5aa0, boardTop:0x3469b5, hole:0x173560, label:'#ffffff', sub:'#d8e4f5', hull:0x8c969f, tile:'#fffaf0', tileInk:'#1c2430', hit:0xd8361e, miss:0xffffff},
+}[DIR==='E'?'D':DIR];
+
+const renderer = new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(1); renderer.setSize(W,H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(30, W/H, 0.1, 200);
+
+function textTex(txt, {font='600 64px Inter, Arial', color='#000', w=512, h=128, align='center', bg=null, radius=0, fit=false, stroke=null}={}){
+  const c=document.createElement('canvas'); c.width=w; c.height=h; const g=c.getContext('2d');
+  g.font=font;
+  if(bg && fit){ const tw=g.measureText(txt).width+44; const x0= align==='center'?(w-tw)/2:(align==='right'?w-12-tw+22:12-22); g.fillStyle=bg; g.beginPath(); g.roundRect(Math.max(2,x0),10,Math.min(tw,w-4),h-20,22); g.fill(); if(stroke){g.strokeStyle=stroke; g.lineWidth=4; g.stroke();} }
+  else if(bg){g.fillStyle=bg; if(radius){g.beginPath();g.roundRect(4,4,w-8,h-8,radius);g.fill();} else g.fillRect(0,0,w,h);}
+  g.fillStyle=color; g.font=font; g.textAlign=align; g.textBaseline='middle';
+  g.fillText(txt, align==='center'?w/2:(align==='right'?w-12:12), h/2+4);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+function label(txt, x, z, opts, wid=2.2, hei=0.55, rotZ=0, y=0.02){
+  const m=new THREE.Mesh(new THREE.PlaneGeometry(wid,hei), new THREE.MeshBasicMaterial({map:textTex(txt,opts), transparent:true, depthWrite:false}));
+  m.rotation.x=-Math.PI/2; m.rotation.z=rotZ; m.position.set(x,y,z); scene.add(m); return m;
+}
+// cell centre: col c (0..9) -> x, row r (0..9) -> z
+const cx = c => c-4.5, cz = r => r-4.5;
+
+// ships: [col,row,len,horizontal,word,revealedMask, sunk]
+const SHIPS = [
+  [1,1,5,true,'ORBIT',[1,1,0,0,0]],
+  [9,2,4,false,'FUEL',[0,1,0,0]],
+  [2,5,6,true,'ROCKET',[1,1,1,1,1,1],true],
+  [0,8,3,true,'JET',[0,0,0]],
+  [8,7,3,false,'HUB',[0,0,1]],
+];
+const MISSES = [[4,0],[5,3],[0,3],[9,0],[6,7],[3,8],[1,6]];
+
+function hullGeo(len){
+  const s=new THREE.Shape(); const L=len*0.98, Wd=0.78;
+  s.moveTo(-L/2+0.15,-Wd/2); s.lineTo(L/2-0.45,-Wd/2); s.quadraticCurveTo(L/2+0.05,0,L/2-0.45,Wd/2);
+  s.lineTo(-L/2+0.15,Wd/2); s.quadraticCurveTo(-L/2-0.05,0,-L/2+0.15,-Wd/2);
+  const g=new THREE.ExtrudeGeometry(s,{depth:0.32,bevelEnabled:true,bevelSize:0.04,bevelThickness:0.04,bevelSegments:2});
+  g.rotateX(-Math.PI/2); return g;
+}
+function ship([c,r,len,hor,word,mask,sunk], style){
+  const grp=new THREE.Group();
+  const hull=new THREE.Mesh(hullGeo(len), new THREE.MeshStandardMaterial({color:style.hull, roughness:0.55, metalness:0.25}));
+  hull.castShadow=true; hull.receiveShadow=true; grp.add(hull);
+  for(let i=0;i<len;i++){
+    const shown = mask[i];
+    const t=new THREE.Mesh(new THREE.PlaneGeometry(0.66,0.66), new THREE.MeshStandardMaterial({
+      map:textTex(word[i],{font:'800 150px Inter, Arial',color: shown? '#ffffff' : style.tileInk, w:256,h:256,bg: shown? '#c8361f' : style.tile, radius:36}), roughness:0.7}));
+    t.rotation.x=-Math.PI/2; t.position.set(i-(len-1)/2, 0.37+0.002, 0); grp.add(t);
+    if(shown){ const fr=new THREE.Mesh(new THREE.RingGeometry(0.36,0.44,4,1,Math.PI/4), new THREE.MeshBasicMaterial({color:style.hit})); fr.rotation.x=-Math.PI/2; fr.position.set(i-(len-1)/2,0.373,0); grp.add(fr); }
+  }
+  const x = hor ? cx(c)+(len-1)/2 : cx(c), z = hor ? cz(r) : cz(r)+(len-1)/2;
+  grp.position.set(x, style.shipY||0, z); if(!hor) grp.rotation.y=-Math.PI/2;
+  if(sunk){ grp.position.y -= 0.06; }
+  scene.add(grp); return grp;
+}
+function peg(color, rad=0.14, h=0.4){
+  const g=new THREE.Group();
+  const m=new THREE.Mesh(new THREE.CylinderGeometry(rad,rad,h,20), new THREE.MeshStandardMaterial({color, roughness:0.35}));
+  m.position.y=h/2; m.castShadow=true; g.add(m);
+  const top=new THREE.Mesh(new THREE.SphereGeometry(rad,20,12,0,Math.PI*2,0,Math.PI/2), m.material); top.position.y=h; g.add(top);
+  return g;
+}
+function gridLines(color, y, opacity=0.6){
+  const pts=[]; for(let i=0;i<=10;i++){ pts.push(-5,y,i-5, 5,y,i-5, i-5,y,-5, i-5,y,5); }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts,3));
+  const l=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color, transparent:true, opacity})); scene.add(l); return l;
+}
+const HLR = P.has('hl') ? 3 : -1, HLC = P.has('hl') ? 4 : -1;
+const HLBG=DARK?'rgba(4,16,12,0.9)':'rgba(255,253,246,0.95)', HLST=DARK?'#ffd27a':'#9a2a1d', HLTX=DARK?'#ffffff':'#0b2a21';
+function axisLabels(col, sub, y=0.03, rowX=-5.25){
+  for(let r=0;r<10;r++){ const hl=r===HLR; label(ROWS[r], rowX-1.6, cz(r), {font:(hl?'700 ':'600 ')+'58px Inter, Arial', color:hl?HLTX:col, align:'right', w:640,h:128, bg:hl?HLBG:null, fit:true, stroke:hl?HLST:null}, 2.5, 0.5, 0, y+(hl?0.01:0));
+    label(String(r+1), -5.25+0.02, cz(r), {font:'700 70px Inter, Arial', color:hl?HLST:sub, w:128,h:128}, 0.42,0.42,0,y); }
+  for(let c=0;c<10;c++){ const hl=c===HLC; label(COLS[c], cx(c), -6.85, {font:(hl?'700 ':'600 ')+'58px Inter, Arial', color:hl?HLTX:col, align:'left', w:640,h:128, bg:hl?HLBG:null, fit:true, stroke:hl?HLST:null}, 2.5, 0.5, Math.PI/2, y+(hl?0.01:0));
+    label(LET[c], cx(c), -5.25, {font:'700 70px Inter, Arial', color:hl?HLST:sub, w:128,h:128}, 0.42,0.42,0,y); }
+}
+function lights(intensity=1){
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.4*intensity));
+  const d=new THREE.DirectionalLight(0xffffff, 1.6*intensity); d.position.set(-6,12,8); d.castShadow=true;
+  d.shadow.mapSize.set(2048,2048); Object.assign(d.shadow.camera,{left:-9,right:9,top:9,bottom:-9}); scene.add(d);
+}
+
+if(DIR==='A'){ // Harbour
+  lights(DARK?0.8:1.05);
+  const geo=new THREE.PlaneGeometry(70,70,260,260); const pos=geo.attributes.position;
+  for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i); pos.setZ(i, 0.05*Math.sin(x*1.7+y*0.6)+0.035*Math.cos(y*2.3-x*0.8));}
+  geo.computeVertexNormals();
+  const water=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:TH.water, roughness:0.25, metalness:0.1}));
+  water.rotation.x=-Math.PI/2; water.receiveShadow=true; scene.add(water);
+  gridLines(TH.grid, 0.09, DARK?0.55:0.75);
+  axisLabels(TH.label, TH.sub, 0.1);
+  SHIPS.forEach(s=>ship(s,{hull:TH.hull,tile:TH.tile,tileInk:TH.tileInk,shipY:0.0,pegHit:true,hit:TH.hit}));
+  MISSES.forEach(([c,r])=>{ // splash rings
+    const ring=new THREE.Mesh(new THREE.RingGeometry(0.16,0.24,32), new THREE.MeshBasicMaterial({color:TH.miss, transparent:true, opacity:0.9}));
+    ring.rotation.x=-Math.PI/2; ring.position.set(cx(c),0.11,cz(r)); scene.add(ring);
+    const p=peg(TH.miss,0.09,0.18); p.position.set(cx(c),0.06,cz(r)); scene.add(p);});
+  // target marker
+  const sel=new THREE.Mesh(new THREE.RingGeometry(0.36,0.46,4,1,Math.PI/4), new THREE.MeshBasicMaterial({color:0xffc83d})); sel.rotation.x=-Math.PI/2; sel.position.set(cx(4),0.12,cz(3)); scene.add(sel);
+  cam.position.set(0.6,17,15); cam.lookAt(-1.1,0,-0.6);
+}
+if(DIR==='B'){ // Radar
+  scene.add(new THREE.AmbientLight(0xffffff, 1.6));
+  const disc=new THREE.Mesh(new THREE.CylinderGeometry(7.6,7.8,0.4,96), new THREE.MeshStandardMaterial({color:TH.disc, roughness:0.8}));
+  disc.position.y=-0.2; scene.add(disc);
+  const rim=new THREE.Mesh(new THREE.TorusGeometry(7.65,0.12,16,128), new THREE.MeshStandardMaterial({color:DARK?0x1a3a2e:0x8a7a52, metalness:0.6, roughness:0.4}));
+  rim.rotation.x=Math.PI/2; scene.add(rim);
+  for(const rr of [2.5,5,7.1]){ const ring=new THREE.Mesh(new THREE.RingGeometry(rr-0.02,rr+0.02,128), new THREE.MeshBasicMaterial({color:TH.grid, transparent:true, opacity:0.35})); ring.rotation.x=-Math.PI/2; ring.position.y=0.01; scene.add(ring); }
+  // sweep
+  const sc=document.createElement('canvas'); sc.width=sc.height=1024; const g=sc.getContext('2d');
+  const grd=g.createConicGradient(-Math.PI/2,512,512); const col=DARK?'47,227,154':'29,92,74';
+  grd.addColorStop(0,`rgba(${col},0.55)`); grd.addColorStop(0.12,`rgba(${col},0)`); grd.addColorStop(1,`rgba(${col},0)`);
+  g.fillStyle=grd; g.beginPath(); g.arc(512,512,512,0,Math.PI*2); g.fill();
+  const st=new THREE.CanvasTexture(sc); st.colorSpace=THREE.SRGBColorSpace;
+  const sweep=new THREE.Mesh(new THREE.CircleGeometry(7.1,96), new THREE.MeshBasicMaterial({map:st, transparent:true, depthWrite:false}));
+  sweep.rotation.x=-Math.PI/2; sweep.rotation.z=-0.9; sweep.position.y=0.015; scene.add(sweep);
+  gridLines(TH.grid, 0.02, 0.55);
+  axisLabels(TH.label, TH.sub, 0.03);
+  // hits: glowing letter pillars; unknown ship cells unseen
+  SHIPS.forEach(([c,r,len,hor,word,mask,sunk])=>{ for(let i=0;i<len;i++){ if(!mask[i]) continue;
+    const x=hor?cx(c+i):cx(c), z=hor?cz(r):cz(r+i);
+    const col = sunk ? (DARK?0xff5a5a:0x7d1f14) : TH.hit;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(0.86,0.06,0.86), new THREE.MeshBasicMaterial({color:col, transparent:true, opacity:sunk?0.35:0.28})); b.position.set(x,0.05,z); scene.add(b);
+    const glyph=new THREE.Mesh(new THREE.PlaneGeometry(0.8,0.8), new THREE.MeshBasicMaterial({map:textTex(word[i],{font:'800 170px "JetBrains Mono", monospace',color:sunk?(DARK?'#ff8a8a':'#7d1f14'):TH.glyph,w:256,h:256}), transparent:true}));
+    glyph.position.set(x,0.5,z); glyph.lookAt(x, 12, z+9); scene.add(glyph);
+  }});
+  MISSES.forEach(([c,r])=>{ const x=new THREE.Mesh(new THREE.RingGeometry(0.12,0.17,24), new THREE.MeshBasicMaterial({color:TH.miss, transparent:true, opacity:0.8})); x.rotation.x=-Math.PI/2; x.position.set(cx(c),0.04,cz(r)); scene.add(x); });
+  // blip being targeted
+  const t=new THREE.Mesh(new THREE.RingGeometry(0.3,0.36,48), new THREE.MeshBasicMaterial({color:DARK?0xffd27a:0x9a2a1d})); t.rotation.x=-Math.PI/2; t.position.set(cx(4),0.05,cz(3)); scene.add(t);
+  const t2=t.clone(); t2.scale.setScalar(1.6); t2.material=t.material.clone(); t2.material.transparent=true; t2.material.opacity=0.4; scene.add(t2);
+  cam.position.set(0,24,8); cam.lookAt(-0.6,0,-0.2);
+}
+if(DIR==='C'){ // Tabletop
+  lights(DARK?0.75:1.0);
+  if(DARK){ const s=new THREE.SpotLight(0xffe2b8, 60, 40, 0.6, 0.5); s.position.set(2,14,6); s.target.position.set(0,0,0); s.castShadow=true; scene.add(s, s.target); }
+  const table=new THREE.Mesh(new THREE.PlaneGeometry(60,60), new THREE.MeshStandardMaterial({color:TH.table, roughness:0.85})); table.rotation.x=-Math.PI/2; table.position.y=-0.5; table.receiveShadow=true; scene.add(table);
+  // base tray
+  const tray=new THREE.Mesh(new THREE.BoxGeometry(14.6,0.5,12.4), new THREE.MeshStandardMaterial({color:TH.board, roughness:0.5})); tray.position.set(-1.6,-0.25,-0.5); tray.castShadow=true; tray.receiveShadow=true; scene.add(tray);
+  const top=new THREE.Mesh(new THREE.BoxGeometry(10.3,0.06,10.3), new THREE.MeshStandardMaterial({color:TH.boardTop, roughness:0.45})); top.position.set(0,0.03,0); top.receiveShadow=true; scene.add(top);
+  // holes
+  const hg=new THREE.CircleGeometry(0.11,20), hm=new THREE.MeshBasicMaterial({color:TH.hole});
+  for(let r=0;r<10;r++)for(let c=0;c<10;c++){ const h=new THREE.Mesh(hg,hm); h.rotation.x=-Math.PI/2; h.position.set(cx(c),0.065,cz(r)); scene.add(h); }
+  gridLines(DARK?0x6f94c9:0x9cbbe6, 0.066, 0.7);
+  axisLabels(TH.label, TH.sub, 0.07, -5.25);
+  SHIPS.forEach(s=>ship(s,{hull:TH.hull,tile:TH.tile,tileInk:TH.tileInk,shipY:0.06,pegHit:true,hit:TH.hit}));
+  MISSES.forEach(([c,r])=>{ const p=peg(TH.miss,0.12,0.42); p.position.set(cx(c),0.06,cz(r)); scene.add(p); });
+  // upright lid (target grid) behind
+  const lid=new THREE.Mesh(new THREE.BoxGeometry(14.6,9.4,0.4), new THREE.MeshStandardMaterial({color:TH.board, roughness:0.5})); lid.position.set(-1.6,4.4,-7.4); lid.rotation.x=-0.12; lid.castShadow=true; scene.add(lid);
+  const lidFace=new THREE.Mesh(new THREE.PlaneGeometry(8.2,8.2), new THREE.MeshStandardMaterial({color:TH.boardTop})); lidFace.position.set(0,4.5,-7.15); lidFace.rotation.x=-0.12; scene.add(lidFace); { const lg=new THREE.Group(); const pts=[]; for(let i=0;i<=10;i++){pts.push(-3.9,i*0.78-3.9,0, 3.9,i*0.78-3.9,0, i*0.78-3.9,-3.9,0, i*0.78-3.9,3.9,0);} const bg=new THREE.BufferGeometry(); bg.setAttribute('position',new THREE.Float32BufferAttribute(pts,3)); lg.add(new THREE.LineSegments(bg,new THREE.LineBasicMaterial({color:DARK?0x6f94c9:0x9cbbe6}))); [[2,3],[5,6],[7,2]].forEach(([a,b])=>{const pg=new THREE.Mesh(new THREE.CircleGeometry(0.16,20),new THREE.MeshBasicMaterial({color:TH.hit})); pg.position.set(a*0.78-3.5,b*0.78-3.5,0.01); lg.add(pg);}); [[1,1],[4,8],[8,5],[6,0]].forEach(([a,b])=>{const pg=new THREE.Mesh(new THREE.CircleGeometry(0.16,20),new THREE.MeshBasicMaterial({color:0xffffff})); pg.position.set(a*0.78-3.5,b*0.78-3.5,0.01); lg.add(pg);}); lg.position.set(0,4.5,-7.13); lg.rotation.x=-0.12; scene.add(lg); }
+  // challenge cards stack
+  for(let i=0;i<4;i++){ const card=new THREE.Mesh(new THREE.BoxGeometry(2.2,0.03,3.0), new THREE.MeshStandardMaterial({color:i===3?0xfff6df:0xf1e4c4, roughness:0.8})); card.position.set(7.4+i*0.02,-0.48+i*0.035,2.4-i*0.03); card.rotation.y=0.18+i*0.04; card.castShadow=true; scene.add(card); }
+  const face=new THREE.Mesh(new THREE.PlaneGeometry(1.9,2.7), new THREE.MeshBasicMaterial({map:textTex('CHALLENGE',{font:'800 70px Inter, Arial',color:'#b0402a',w:512,h:700}), transparent:true}));
+  face.rotation.x=-Math.PI/2; face.rotation.z=0.3; face.position.set(7.46,-0.34,2.31); scene.add(face);
+  cam.position.set(3.5,18,18); cam.lookAt(-0.4,1,-1.2);
+}
+
+if(DIR==='D'||DIR==='E'){ // Harbour board, enemy view, console palette
+  const PD = DARK ? {disc:0x04140f, discO:0.55, ring:0x2fe39a, rgb:'47,227,154', line:'rgba(120,255,200,0.9)', sel:0xffd27a, buoy:0x2a2a22, tile:'#ffb020', ink:'#04100c', glow:0xffb020, peg:0xdff7ec, sunkHull:0x3a2a28, sunkTile:'#ff6b5a', ownHull:0x51605b, ownTile:'#eaf6ef', ghost:0x2fe39a, light:0.75} : {disc:0xfbf8ee, discO:0.45, ring:0x1d5c4a, rgb:'29,92,74', line:'rgba(29,92,74,0.9)', sel:0x9a2a1d, buoy:0xe9e1c8, tile:'#c2410c', ink:'#ffffff', glow:0xc2410c, peg:0x1d5c4a, sunkHull:0x5c4a44, sunkTile:'#9a2a1d', ownHull:0x8b9a93, ownTile:'#fffdf6', ghost:0x1d5c4a, light:1.05};
+  lights(PD.light);
+  const geo=new THREE.PlaneGeometry(70,70,260,260); const pos=geo.attributes.position;
+  for(let i=0;i<pos.count;i++){const x=pos.getX(i),y=pos.getY(i); pos.setZ(i, 0.05*Math.sin(x*1.7+y*0.6)+0.035*Math.cos(y*2.3-x*0.8));}
+  geo.computeVertexNormals();
+  const water=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:TH.water, roughness:0.22, metalness:0.15, emissive:DARK?0x000000:0x6e6a5e}));
+  water.rotation.x=-Math.PI/2; water.receiveShadow=true; scene.add(water);
+  { // radar decal under the grid
+    const dec=new THREE.Group(); const top=(m,o)=>{m.material.depthWrite=false; m.material.transparent=true; if(o!==undefined) m.material.opacity=o; m.renderOrder=-1; m.rotation.x=-Math.PI/2; m.position.y=0.09; dec.add(m); return m;};
+    top(new THREE.Mesh(new THREE.CircleGeometry(7.4,128), new THREE.MeshBasicMaterial({color:PD.disc})),PD.discO);
+    for(const rr of [1.8,3.6,5.4,7.2]) top(new THREE.Mesh(new THREE.RingGeometry(rr-0.03,rr+0.03,160), new THREE.MeshBasicMaterial({color:PD.ring})),0.32);
+    top(new THREE.Mesh(new THREE.RingGeometry(7.32,7.42,160), new THREE.MeshBasicMaterial({color:PD.ring})),0.6);
+    { const tc=document.createElement('canvas'); tc.width=tc.height=1024; const tg=tc.getContext('2d'); tg.strokeStyle='rgba('+PD.rgb+',0.7)'; for(let k=0;k<72;k++){ const an=k/72*Math.PI*2, L=k%6===0?26:12; tg.lineWidth=k%6===0?4:2; tg.beginPath(); tg.moveTo(512+Math.cos(an)*(500-L),512+Math.sin(an)*(500-L)); tg.lineTo(512+Math.cos(an)*500,512+Math.sin(an)*500); tg.stroke(); } const tt=new THREE.CanvasTexture(tc); top(new THREE.Mesh(new THREE.CircleGeometry(7.3,128), new THREE.MeshBasicMaterial({map:tt}))); }
+    const sc=document.createElement('canvas'); sc.width=sc.height=1024; const g=sc.getContext('2d');
+    const grd=g.createConicGradient(-Math.PI/2,512,512); grd.addColorStop(0,'rgba('+PD.rgb+','+(DARK?0.42:0.3)+')'); grd.addColorStop(0.14,'rgba('+PD.rgb+',0)'); grd.addColorStop(1,'rgba('+PD.rgb+',0)');
+    g.fillStyle=grd; g.beginPath(); g.arc(512,512,512,0,Math.PI*2); g.fill();
+    g.strokeStyle=PD.line; g.lineWidth=5; g.beginPath(); g.moveTo(512,512); g.lineTo(512,0); g.stroke();
+    const st=new THREE.CanvasTexture(sc); st.colorSpace=THREE.SRGBColorSpace;
+    const sw=top(new THREE.Mesh(new THREE.CircleGeometry(7.3,128), new THREE.MeshBasicMaterial({map:st}))); sw.rotation.z=-0.9;
+    scene.add(dec);
+  }
+  gridLines(TH.grid, 0.1, 0.5);
+  axisLabels(TH.label, TH.sub, 0.1);
+  if(DIR==='E'){ // fleet setup: own words placed, one ship being dragged
+    const own={hull:PD.ownHull,tile:PD.ownTile,tileInk:'#04100c',shipY:0.0};
+    [[1,1,5,true,'ORBIT',[0,0,0,0,0]],[8,3,4,false,'WING',[0,0,0,0]],[0,8,3,true,'JET',[0,0,0]]].forEach(sp=>ship(sp,own));
+    // ghost THRUST hovering over row 6, cols C-H
+    for(let i=0;i<6;i++){ const hlc=new THREE.Mesh(new THREE.PlaneGeometry(0.94,0.94), new THREE.MeshBasicMaterial({color:PD.ghost, transparent:true, opacity:0.28, depthWrite:false})); hlc.rotation.x=-Math.PI/2; hlc.position.set(cx(2+i),0.11,cz(5)); scene.add(hlc); }
+    const g=ship([2,5,6,true,'THRUST',[0,0,0,0,0,0]],{hull:PD.ghost,tile:PD.ownTile,tileInk:'#04100c',shipY:0.75});
+    g.traverse(o=>{ if(o.material){ o.material=o.material.clone(); o.material.transparent=true; o.material.opacity= o.geometry.type==='ExtrudeGeometry'?0.55:0.92; } });
+    g.rotation.z=0.03;
+  } else {
+  // hits on unknown ships: floating amber letter buoys
+  SHIPS.forEach(([c,r,len,hor,word,mask,sunk])=>{
+    if(sunk){ ship([c,r,len,hor,word,mask,sunk],{hull:PD.sunkHull,tile:PD.sunkTile,tileInk:DARK?'#04100c':'#ffffff',shipY:-0.08}); return; }
+    for(let i=0;i<len;i++){ if(!mask[i]) continue; const x=hor?cx(c+i):cx(c), z=hor?cz(r):cz(r+i);
+      const buoy=new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.44,0.22,32), new THREE.MeshStandardMaterial({color:PD.buoy, roughness:0.6})); buoy.position.set(x,0.12,z); buoy.castShadow=true; scene.add(buoy);
+      const t=new THREE.Mesh(new THREE.PlaneGeometry(0.68,0.68), new THREE.MeshBasicMaterial({map:textTex(word[i],{font:'800 160px "JetBrains Mono", monospace',color:PD.ink,w:256,h:256,bg:PD.tile,radius:40}), transparent:true}));
+      t.rotation.x=-Math.PI/2; t.position.set(x,0.24,z); scene.add(t);
+      const glow=new THREE.Mesh(new THREE.RingGeometry(0.46,0.62,40), new THREE.MeshBasicMaterial({color:PD.glow, transparent:true, opacity:0.35})); glow.rotation.x=-Math.PI/2; glow.position.set(x,0.1,z); scene.add(glow);
+    }});
+  MISSES.forEach(([c,r])=>{
+    const ring=new THREE.Mesh(new THREE.RingGeometry(0.16,0.24,32), new THREE.MeshBasicMaterial({color:TH.miss, transparent:true, opacity:0.8}));
+    ring.rotation.x=-Math.PI/2; ring.position.set(cx(c),0.11,cz(r)); scene.add(ring);
+    const p=peg(PD.peg,0.08,0.16); p.position.set(cx(c),0.06,cz(r)); scene.add(p);});
+  const sel=new THREE.Mesh(new THREE.RingGeometry(0.36,0.46,4,1,Math.PI/4), new THREE.MeshBasicMaterial({color:PD.sel})); sel.rotation.x=-Math.PI/2; sel.position.set(cx(4),0.12,cz(3)); scene.add(sel);
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,3,12), new THREE.MeshBasicMaterial({color:0xffd27a, transparent:true, opacity:0.5})); beam.position.set(cx(4),1.5,cz(3)); 
+  }
+  cam.position.set(-0.6,18.5,16); cam.lookAt(-1.7,0,-0.5);
+}
+if(H>W){ const look=new THREE.Vector3(-0.8,0,-0.4); cam.position.sub(look).multiplyScalar(1.55).add(look); cam.lookAt(look);} renderer.render(scene,cam);
+window.__done=true;
+</script></body></html>

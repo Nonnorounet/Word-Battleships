@@ -1,0 +1,285 @@
+{
+ "packs": [
+  {
+   "name": "Aerospace",
+   "rows": [
+    {
+     "word": "The engineer",
+     "fr": "L'ingénieur"
+    },
+    {
+     "word": "Our team",
+     "fr": "Notre équipe"
+    },
+    {
+     "word": "The satellite",
+     "fr": "Le satellite"
+    },
+    {
+     "word": "The client",
+     "fr": "Le client"
+    },
+    {
+     "word": "The pilot",
+     "fr": "Le pilote"
+    },
+    {
+     "word": "I",
+     "fr": "Je"
+    },
+    {
+     "word": "The supplier",
+     "fr": "Le fournisseur"
+    },
+    {
+     "word": "We",
+     "fr": "Nous"
+    },
+    {
+     "word": "The test",
+     "fr": "L'essai"
+    },
+    {
+     "word": "My manager",
+     "fr": "Mon responsable"
+    }
+   ],
+   "cols": [
+    {
+     "word": "launch",
+     "fr": "lancer"
+    },
+    {
+     "word": "delay",
+     "fr": "retarder"
+    },
+    {
+     "word": "check",
+     "fr": "vérifier"
+    },
+    {
+     "word": "design",
+     "fr": "concevoir"
+    },
+    {
+     "word": "approve",
+     "fr": "approuver"
+    },
+    {
+     "word": "deliver",
+     "fr": "livrer"
+    },
+    {
+     "word": "fail",
+     "fr": "échouer"
+    },
+    {
+     "word": "update",
+     "fr": "mettre à jour"
+    },
+    {
+     "word": "measure",
+     "fr": "mesurer"
+    },
+    {
+     "word": "schedule",
+     "fr": "planifier"
+    }
+   ],
+   "ships": [
+    {
+     "word": "ROCKET",
+     "hintEn": "A vehicle that carries a payload into space",
+     "hintFr": "Un véhicule qui emporte une charge dans l'espace"
+    },
+    {
+     "word": "ENGINE",
+     "hintEn": "The part that produces thrust",
+     "hintFr": "La partie qui produit la poussée"
+    },
+    {
+     "word": "BUDGET",
+     "hintEn": "The money planned for a project",
+     "hintFr": "L'argent prévu pour un projet"
+    },
+    {
+     "word": "LAUNCH",
+     "hintEn": "The moment a rocket leaves the pad",
+     "hintFr": "Le moment où la fusée quitte le pas de tir"
+    },
+    {
+     "word": "ORBIT",
+     "hintEn": "The path around a planet",
+     "hintFr": "La trajectoire autour d'une planète"
+    },
+    {
+     "word": "PILOT",
+     "hintEn": "The person who flies the aircraft",
+     "hintFr": "La personne qui pilote l'avion"
+    },
+    {
+     "word": "CARGO",
+     "hintEn": "Goods carried by a plane or ship",
+     "hintFr": "Les marchandises transportées"
+    },
+    {
+     "word": "RADAR",
+     "hintEn": "It detects aircraft with radio waves",
+     "hintFr": "Il détecte les avions par ondes radio"
+    },
+    {
+     "word": "DELAY",
+     "hintEn": "When something happens later than planned",
+     "hintFr": "Quand quelque chose arrive plus tard que prévu"
+    },
+    {
+     "word": "WING",
+     "hintEn": "It gives an aircraft lift",
+     "hintFr": "Elle donne de la portance à l'avion"
+    },
+    {
+     "word": "FUEL",
+     "hintEn": "What an engine burns",
+     "hintFr": "Ce que brûle un moteur"
+    },
+    {
+     "word": "CREW",
+     "hintEn": "The team on board",
+     "hintFr": "L'équipe à bord"
+    },
+    {
+     "word": "GATE",
+     "hintEn": "Where passengers board",
+     "hintFr": "L'endroit où les passagers embarquent"
+    },
+    {
+     "word": "TEST",
+     "hintEn": "A trial before approval",
+     "hintFr": "Un essai avant validation"
+    },
+    {
+     "word": "JET",
+     "hintEn": "A fast aircraft or engine type",
+     "hintFr": "Un avion ou moteur rapide"
+    },
+    {
+     "word": "HUB",
+     "hintEn": "A central airport for connections",
+     "hintFr": "Un aéroport central pour les correspondances"
+    },
+    {
+     "word": "BAY",
+     "hintEn": "A space for cargo or payload",
+     "hintFr": "Un compartiment pour la charge"
+    },
+    {
+     "word": "LAB",
+     "hintEn": "Short for laboratory",
+     "hintFr": "Abréviation de laboratoire"
+    },
+    {
+     "word": "FIN",
+     "hintEn": "A small vertical surface for stability",
+     "hintFr": "Une petite surface verticale pour la stabilité"
+    },
+    {
+     "word": "DOCK",
+     "hintEn": "To join two spacecraft together",
+     "hintFr": "Amarrer deux vaisseaux"
+    }
+   ],
+   "challenges": [
+    {
+     "type": "Definition",
+     "prompt": "The path a satellite follows around the Earth",
+     "answer": "orbit",
+     "also": [],
+     "hintFr": "Trajectoire autour de la Terre"
+    },
+    {
+     "type": "Translation",
+     "prompt": "un retard",
+     "answer": "a delay",
+     "also": [
+      "delay"
+     ],
+     "hintFr": "Nom, pas verbe"
+    },
+    {
+     "type": "Gap fill",
+     "prompt": "The launch was ___ because of high winds.",
+     "answer": "postponed",
+     "also": [
+      "delayed"
+     ],
+     "hintFr": "Reporté à plus tard"
+    },
+    {
+     "type": "Translation",
+     "prompt": "le carburant",
+     "answer": "fuel",
+     "also": [],
+     "hintFr": "Ce que brûle un moteur"
+    },
+    {
+     "type": "Definition",
+     "prompt": "A company that provides parts or services",
+     "answer": "supplier",
+     "also": [
+      "provider",
+      "vendor"
+     ],
+     "hintFr": "Il vous vend des pièces"
+    },
+    {
+     "type": "Gap fill",
+     "prompt": "Could you ___ the figures before the meeting?",
+     "answer": "check",
+     "also": [
+      "double-check",
+      "review"
+     ],
+     "hintFr": "Vérifier"
+    },
+    {
+     "type": "Translation",
+     "prompt": "l'équipage",
+     "answer": "the crew",
+     "also": [
+      "crew"
+     ],
+     "hintFr": "Les personnes à bord"
+    },
+    {
+     "type": "Definition",
+     "prompt": "The team on the ground that monitors a mission",
+     "answer": "mission control",
+     "also": [
+      "ground control"
+     ],
+     "hintFr": "Le centre de contrôle"
+    },
+    {
+     "type": "Gap fill",
+     "prompt": "We need the client to ___ the budget by Friday.",
+     "answer": "approve",
+     "also": [
+      "sign off",
+      "validate"
+     ],
+     "hintFr": "Donner son accord"
+    },
+    {
+     "type": "Translation",
+     "prompt": "un lanceur",
+     "answer": "a launcher",
+     "also": [
+      "launcher",
+      "launch vehicle"
+     ],
+     "hintFr": "Il emporte le satellite"
+    }
+   ]
+  }
+ ]
+}

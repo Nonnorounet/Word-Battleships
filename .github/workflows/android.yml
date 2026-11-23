@@ -1,0 +1,55 @@
+name: Android (APK)
+
+on:
+  push:
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21, cache: gradle }
+      - run: npm ci
+      - run: npm run build:web
+      - run: npx cap sync android
+      - name: Version from package.json
+        run: |
+          V=$(node -p "require('./package.json').version")
+          echo "WB_VERSION_NAME=$V" >> $GITHUB_ENV
+          echo "WB_VERSION_CODE=$(node -p "const [a,b,c]='$V'.split('.').map(Number); a*10000+b*100+c")" >> $GITHUB_ENV
+      - name: Keystore (optional)
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> $GITHUB_ENV
+      - name: Build
+        working-directory: android
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$ANDROID_KEYSTORE_PATH" ]; then ./gradlew assembleRelease; else ./gradlew assembleDebug; fi
+      - name: Collect the APK
+        run: |
+          F=$(ls android/app/build/outputs/apk/release/*.apk 2>/dev/null | head -1)
+          [ -z "$F" ] && F=$(ls android/app/build/outputs/apk/debug/*.apk | head -1)
+          cp "$F" "WordBattleships-$WB_VERSION_NAME.apk"
+      - uses: actions/upload-artifact@v4
+        with: { name: word-battleships-apk, path: 'WordBattleships-*.apk' }
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with: { files: 'WordBattleships-*.apk' }
