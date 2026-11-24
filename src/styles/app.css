@@ -6,6 +6,11 @@
   --head: 'Space Grotesk', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
   --cardfont: 'Bricolage Grotesque', 'Space Grotesk', sans-serif; --body: Inter, system-ui, sans-serif;
   color-scheme: dark;
+  /* system bars and notches (Android edge-to-edge, iOS): Capacitor's SystemBars injects --safe-area-inset-*, browsers give env() */
+  --sat: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --sar: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+  --sab: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --sal: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
 }
 :root[data-theme='light'] {
   --bg: #f3efe2; --surface: #fbf8ee; --ink: #183f33; --muted: #4c6659; --line: #d9d1b8;
@@ -60,9 +65,9 @@ textarea.input { padding: 10px 12px; resize: vertical; min-height: 72px; }
 .langs button[aria-pressed='true'] { background: var(--primary); color: var(--on-primary); }
 
 /* layout */
-#app { display: flex; flex-direction: column; height: 100%; }
+#app { display: flex; flex-direction: column; height: 100%; padding: var(--sat) var(--sar) var(--sab) var(--sal); }
 .page { flex: 1; overflow: auto; }
-.game { flex: 1; display: grid; grid-template-columns: 340px minmax(0, 1fr) 320px; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
+.game { position: relative; flex: 1; display: grid; grid-template-columns: 340px minmax(0, 1fr) 320px; grid-template-rows: minmax(0, 1fr) auto; min-height: 0; }
 .panel { padding: 18px 22px; overflow: auto; min-height: 0; }
 .panel.left { border-right: 1.5px solid var(--line); }
 .panel.right { border-left: 1.5px solid var(--line); }
@@ -133,7 +138,7 @@ textarea.input { padding: 10px 12px; resize: vertical; min-height: 72px; }
 .err { color: var(--hit); font-size: 13px; }
 .note { display: flex; align-items: flex-start; gap: 10px; margin: 20px 0 0; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); font-size: 14px; line-height: 1.5; }
 .note svg { flex: none; color: var(--hit); margin-top: 2px; }
-.toast { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 18px; z-index: 20; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
+.toast { position: fixed; left: 50%; bottom: calc(96px + var(--sab)); transform: translateX(-50%); background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 18px; z-index: 20; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); }
 
 /* setup */
 .slot { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--surface); cursor: pointer; text-align: left; }
@@ -144,30 +149,54 @@ textarea.input { padding: 10px 12px; resize: vertical; min-height: 72px; }
 .pickers button { min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1.5px solid var(--line); background: transparent; color: var(--ink); font-weight: 700; letter-spacing: 0.08em; cursor: pointer; font-size: 13px; }
 .progress { height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; }
 .progress i { display: block; height: 100%; background: var(--primary); }
-.floattools { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 8px; padding: 8px; border-radius: 14px; background: var(--surface); border: 1.5px solid var(--line); flex-wrap: wrap; justify-content: center; }
+.floattools { position: absolute; left: 0; right: 0; bottom: 16px; margin: 0 auto; width: max-content; max-width: calc(100% - 24px); display: flex; gap: 8px; padding: 8px; border-radius: 14px; background: var(--surface); border: 1.5px solid var(--line); flex-wrap: wrap; justify-content: center; align-items: center; }
+.budget { margin: 2px 0 10px; font-size: 13px; color: var(--target); }
+.budget.ok { color: var(--primary); }
+.pickers button.pk { border-color: var(--primary); }
+.slottools { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
+.slottools .btn { flex: 1; min-height: 40px; padding: 0 10px; font-size: 14px; }
+.shipsel { display: flex; align-items: center; gap: 4px; }
+.shipsel b { min-width: 92px; text-align: center; letter-spacing: 0.12em; font-size: 14px; }
+.shipsel b.todo { color: var(--target); letter-spacing: 0.02em; font-weight: 600; }
 
 /* tablet */
 @media (max-width: 1099px) {
   .game { grid-template-columns: minmax(0, 1fr) 300px; }
   .panel.left { display: none; }
-  .game.showlog .panel.left { display: block; position: absolute; z-index: 8; top: 64px; bottom: 0; left: 0; width: min(360px, 90vw); background: var(--surface); box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3); }
-  .lobby { grid-template-columns: 1fr; }
+  .game.showlog .panel.left { display: block; position: fixed; z-index: 8; top: calc(var(--sat) + 64px); bottom: var(--sab); left: var(--sal); width: min(360px, 90vw); background: var(--surface); box-shadow: 10px 0 30px rgba(0, 0, 0, 0.3); }
+  /* fleet setup: the ships panel (word entry) must stay visible */
+  .game.setup { grid-template-columns: 290px minmax(0, 1fr) 270px; }
+  .game.setup .panel.left { display: block; }
+  .lobby { grid-template-columns: 1fr; overflow-y: auto; }
+  .lobby > section { overflow: visible; }
   .lobby > section:first-child { border-right: 0; border-bottom: 1.5px solid var(--line); }
   .grid3 { grid-template-columns: 1fr 1fr; }
 }
+/* narrow tablet and phone, fleet setup: board on top, then ships, then Ready */
+@media (max-width: 899px) {
+  .game.setup { display: flex; flex-direction: column; overflow-y: auto; }
+  .game.setup .centre { order: 1; flex: none; height: 52vh; min-height: 300px; }
+  .game.setup .panel { flex: none; overflow: visible; border-left: 0; border-right: 0; border-top: 1.5px solid var(--line); }
+  .game.setup .panel.left { order: 2; }
+  .game.setup .panel.right { order: 3; padding-bottom: 28px; }
+}
 /* phone */
 @media (max-width: 699px) {
-  body { overflow: auto; }
   .top { padding: 8px 12px; }
   .brand b { font-size: 17px; }
   .chip, .top .scores .lab { display: none; }
-  .game { display: flex; flex-direction: column; }
-  .centre { height: 52vh; min-height: 320px; flex: none; }
+  .game { display: flex; flex-direction: column; overflow-y: auto; }
+  .game .panel { flex: none; overflow: visible; }
+  .centre { height: 52vh; min-height: 300px; flex: none; }
   .panel.right { border-left: 0; border-top: 1.5px solid var(--line); }
   .bar { position: sticky; bottom: 0; padding: 12px 14px; gap: 10px; }
   .bar .btn.primary { width: 100%; }
-  .overlay { position: fixed; align-items: flex-end; padding: 0; }
-  .card { transform: none; border-radius: 18px 18px 0 0; max-height: 88vh; width: 100%; }
+  .overlay { position: fixed; align-items: flex-end; padding: var(--sat) var(--sar) 0 var(--sal); }
+  .card { transform: none; border-radius: 18px 18px 0 0; max-height: 88vh; width: 100%; padding-bottom: calc(22px + var(--sab)); }
+  .floattools { bottom: 10px; gap: 6px; padding: 6px; }
+  .floattools .btn { min-height: 40px; padding: 0 12px; font-size: 14px; }
+  .floattools .btn.icon { width: 40px; padding: 0; }
+  .floattools .long { display: none; }
   .grid3, .grid2 { grid-template-columns: 1fr; }
   .code { font-size: 38px; }
   .hero h1 { font-size: 30px; }

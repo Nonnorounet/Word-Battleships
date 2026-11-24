@@ -65,4 +65,4 @@ The full specification is in [HANDOFF.md](HANDOFF.md).
 
 Word Battleships is free for **non-commercial use** under the [PolyForm Noncommercial License 1.0.0](LICENSE.md): personal use, study, and use by schools, charities and public bodies. Any commercial use, including in paid training, needs written permission from the author.
 
-Bundled libraries keep their own licences: three.js and PeerJS (MIT), and the fonts (SIL Open Font License).
+Bundled libraries keep their own licences: three.js and PeerJS (MIT), and the fonts (SIL Open Font License). The autocomplete word list comes from SCOWL (Kevin Atkinson, via the `wordlist-english` package); its notice is in `src/data/common-words.LICENSE.txt`.

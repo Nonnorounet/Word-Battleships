@@ -1,6 +1,6 @@
 import {
   type Card, type GameState, type LastResult, type Options, type Pack, type Ship, type Team, type TeamId,
-  FLEET, key, other,
+  BUDGETS, DEFAULT_BUDGET, MAX_LEN, MIN_LEN, RANDOM_PATTERNS, SHIPS, budgetRange, key, other,
 } from './types';
 
 export const SCORE = { hit: 1, bonus: 1, sinkByHits: 2, sinkByGuess: 3 } as const;
@@ -14,6 +14,7 @@ export const defaultOptions = (): Options => ({
   allowOwn: true,
   ownHints: true,
   touching: true,
+  budget: DEFAULT_BUDGET,
 });
 
 const newTeam = (name: string): Team => ({ name, connected: false, fleet: null, ready: false, score: 0, shots: {}, sunk: {} });
@@ -43,11 +44,23 @@ export function checkAnswer(given: string | undefined, answer: string, also: str
   return [answer, ...also].some((a) => normaliseAnswer(a) === g);
 }
 
+export const fleetLetters = (fleet: Pick<Ship, 'word'>[]) => fleet.reduce((n, s) => n + s.word.length, 0);
+
+/** Checks the words only (count, lengths, total). Returns an error code or null. */
+export function wordsError(fleet: Pick<Ship, 'word'>[], budget?: string): string | null {
+  if (fleet.length !== SHIPS) return 'count';
+  if (fleet.some((s) => s.word.length < MIN_LEN || s.word.length > MAX_LEN)) return 'lengths';
+  if (budget) {
+    const [lo, hi] = budgetRange(budget), n = fleetLetters(fleet);
+    if (n < lo || n > hi) return 'budget';
+  }
+  return null;
+}
+
 /** Validates a full fleet. Returns an error code or null. */
-export function fleetError(fleet: Ship[], touching: boolean): string | null {
-  if (fleet.length !== FLEET.length) return 'count';
-  const lens = fleet.map((s) => s.word.length).sort((a, b) => b - a);
-  if (lens.join() !== [...FLEET].join()) return 'lengths';
+export function fleetError(fleet: Ship[], touching: boolean, budget?: string): string | null {
+  const we = wordsError(fleet, budget);
+  if (we) return we;
   const occ = new Map<string, number>();
   for (let i = 0; i < fleet.length; i++) {
     const s = fleet[i];
@@ -76,16 +89,29 @@ export function shuffle<T>(a: T[], rnd = Math.random): T[] {
   return b;
 }
 
-/** Picks one pack word per fleet slot. */
-export function randomWords(pack: Pack, rnd = Math.random): Ship[] {
-  const pool = shuffle(pack.ships, rnd);
-  const used = new Set<string>();
-  return FLEET.map((len) => {
-    const w = pool.find((s) => normaliseWord(s.word).length === len && !used.has(s.word));
-    if (!w) throw new Error(`pack has too few ${len}-letter ship words`);
-    used.add(w.word);
-    return { word: normaliseWord(w.word), hintEn: w.hintEn, hintFr: w.hintFr, r: 0, c: 0, horiz: true, own: false };
-  });
+const toShip = (w: { word: string; hintEn: string; hintFr: string }): Ship => ({ word: normaliseWord(w.word), hintEn: w.hintEn, hintFr: w.hintFr, r: 0, c: 0, horiz: true, own: false });
+
+/** Picks 5 pack words within the budget. Uses a fixed length pattern when the pack allows it, so both teams get the same total. */
+export function randomWords(pack: Pack, rnd = Math.random, budget = DEFAULT_BUDGET): Ship[] {
+  const [lo, hi] = budgetRange(budget);
+  const pool = shuffle(pack.ships.filter((s) => { const n = normaliseWord(s.word).length; return n >= MIN_LEN && n <= MAX_LEN; }), rnd);
+  for (const pattern of RANDOM_PATTERNS) {
+    const total = pattern.reduce((a, b) => a + b, 0);
+    if (total < lo || total > hi) continue;
+    const used = new Set<string>();
+    const out: Ship[] = [];
+    for (const len of pattern) {
+      const w = pool.find((s) => normaliseWord(s.word).length === len && !used.has(s.word));
+      if (!w) break;
+      used.add(w.word); out.push(toShip(w));
+    }
+    if (out.length === SHIPS) return out;
+  }
+  for (let attempt = 0; attempt < 2000; attempt++) {
+    const pick = shuffle(pool, rnd).slice(0, SHIPS).map(toShip);
+    if (pick.length === SHIPS && !wordsError(pick, budget) && new Set(pick.map((p) => p.word)).size === SHIPS) return pick;
+  }
+  throw new Error('pack has too few ship words for this letter total');
 }
 
 /** Places the given words at random, keeping them valid. */
@@ -211,6 +237,7 @@ export function apply(prev: GameState, by: TeamId, act: Action, now = Date.now()
       if (by !== 0 || s.phase !== 'lobby') return fail('not-allowed');
       s.options = { ...s.options, ...act.options };
       s.options.judgeSeconds = Math.max(30, Math.min(180, Math.round(s.options.judgeSeconds)));
+      if (!(BUDGETS as readonly string[]).includes(s.options.budget)) s.options.budget = DEFAULT_BUDGET;
       return bump(s);
     case 'pack':
       if (by !== 0 || s.phase !== 'lobby') return fail('not-allowed');
@@ -220,7 +247,7 @@ export function apply(prev: GameState, by: TeamId, act: Action, now = Date.now()
       const o = s.options;
       for (const t of s.teams) {
         t.fleet = null; t.ready = false; t.score = 0; t.shots = {}; t.sunk = {};
-        if (o.wordsMode === 'random') t.fleet = randomWords(s.pack, rnd);
+        if (o.wordsMode === 'random') t.fleet = randomWords(s.pack, rnd, o.budget);
         if (o.wordsMode === 'random' && o.placeMode === 'random') { t.fleet = randomPlace(t.fleet!, o.touching, rnd); t.ready = true; }
       }
       s.log = []; s.used = []; s.winner = null;
@@ -248,12 +275,10 @@ export function apply(prev: GameState, by: TeamId, act: Action, now = Date.now()
         }
         if (new Set(fleet.map((w) => w.word)).size !== fleet.length) return fail('duplicate');
       }
-      if (o.placeMode === 'random') {
-        const lens = fleet.map((w) => w.word.length).sort((a, b) => b - a).join();
-        if (lens !== [...FLEET].join()) return fail('lengths');
-        fleet = randomPlace(fleet, o.touching, rnd);
-      }
-      const err = fleetError(fleet, o.touching);
+      const we = wordsError(fleet, o.wordsMode === 'choose' ? o.budget : undefined);
+      if (we) return fail(we);
+      if (o.placeMode === 'random') fleet = randomPlace(fleet, o.touching, rnd);
+      const err = fleetError(fleet, o.touching, o.wordsMode === 'choose' ? o.budget : undefined);
       if (err) return fail(err);
       me.fleet = fleet; me.ready = true;
       if (s.teams.every((t) => t.ready)) beginPlay(s, rnd);
