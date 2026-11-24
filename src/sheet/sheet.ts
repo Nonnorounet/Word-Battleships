@@ -1,5 +1,5 @@
 import type { Challenge, ChallengeType, Pack } from '../state/types';
-import { FLEET } from '../state/types';
+import { MAX_LEN, MIN_LEN, SHIPS } from '../state/types';
 import { normaliseWord } from '../state/rules';
 
 export const TABS = ['Grid words', 'Ship words', 'Challenges'] as const;
@@ -73,12 +73,8 @@ export function packsFromCsv(grid: string, ships: string, challenges: string): P
 export function packProblem(p: Pack): string | null {
   if (p.rows.length < 10) return `${p.rows.length}/10 row words`;
   if (p.cols.length < 10) return `${p.cols.length}/10 column words`;
-  const need = new Map<number, number>();
-  for (const n of FLEET) need.set(n, (need.get(n) ?? 0) + 1);
-  for (const [len, n] of need) {
-    const have = p.ships.filter((s) => s.word.length === len).length;
-    if (have < n) return `${have}/${n} ship words of ${len} letters`;
-  }
+  const have = p.ships.filter((s) => s.word.length >= MIN_LEN && s.word.length <= MAX_LEN).length;
+  if (have < SHIPS) return `${have}/${SHIPS} ship words of ${MIN_LEN} to ${MAX_LEN} letters`;
   return null;
 }
 
