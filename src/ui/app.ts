@@ -5,14 +5,17 @@ import { LocalTransport } from '../net/local';
 import { PeerTransport } from '../net/peer';
 import { cleanCode, newCode, type Transport } from '../net/transport';
 import { loadSheet, packProblem } from '../sheet/sheet';
-import { fleetError, normaliseWord, partialFleetOk, shipAt, shipCells, type Action, type View } from '../state/rules';
-import { FLEET, LETTERS, cellName, key, other, type Lang, type Options, type Pack, type Ship } from '../state/types';
+import { fleetError, fleetLetters, normaliseWord, partialFleetOk, shipAt, shipCells, wordsError, type Action, type View } from '../state/rules';
+import commonRaw from '../data/common-words.txt?raw';
+import { BUDGETS, MAX_LEN, MIN_LEN, SHIPS, budgetRange, LETTERS, cellName, key, other, type Lang, type Options, type Pack, type Ship } from '../state/types';
 import { getLang, onLang, setLang, t, tErr, tStatus, tType } from '../i18n/i18n';
 import { esc, icon, patch, store } from './util';
 
 // ---------------------------------------------------------------- state
 const BUILT_IN = (builtIn.packs as Pack[]);
-interface Slot { len: number; word: string; hintEn: string; hintFr: string; placed: { r: number; c: number; horiz: boolean } | null }
+/** Common English words (SCOWL levels 10–35, 3–10 letters), most common first: for autocomplete. */
+const COMMON = commonRaw.split('\n').filter(Boolean);
+interface Slot { word: string; hintEn: string; hintFr: string; placed: { r: number; c: number; horiz: boolean } | null }
 
 let session: Session | null = null;
 let board: BoardScene | null = null;
@@ -176,6 +179,7 @@ function lobbyHtml(w: View) {
           <div class="field"><span>${t('shipPlacement')}</span>${seg('placeMode', [['random', t('random')], ['place', t('eachPlaces')]], o.placeMode)}</div>
         </div>
         <div class="grid2" style="gap:8px 22px">
+          <div class="field" style="grid-column:1 / -1"><span>${t('budget')}</span>${seg('budget', BUDGETS.map((b) => [b, b.replace('-', '–')] as [string, string]), o.budget)}</div>
           ${chk('allowOwn', t('allowOwn'), t('allowOwnSub'))}
           ${chk('ownHints', t('ownHints'), t('ownHintsSub'))}
           ${chk('touching', t('touching'))}
@@ -199,10 +203,25 @@ function initSlots(w: View) {
   if (ui.setupFor === id) return;
   ui.setupFor = id;
   const fixed = w.options.wordsMode === 'random' ? w.myFleet : null;
-  ui.slots = FLEET.map((len, i) => ({ len, word: fixed?.[i]?.word ?? '', hintEn: fixed?.[i]?.hintEn ?? '', hintFr: fixed?.[i]?.hintFr ?? '', placed: null }));
+  ui.slots = Array.from({ length: SHIPS }, (_, i) => ({ word: fixed?.[i]?.word ?? '', hintEn: fixed?.[i]?.hintEn ?? '', hintFr: fixed?.[i]?.hintFr ?? '', placed: null }));
   ui.active = 0; ui.horiz = true;
 }
-const slotOk = (s: Slot) => normaliseWord(s.word).length === s.len;
+const slotOk = (s: Slot) => { const n = normaliseWord(s.word).length; return n >= MIN_LEN && n <= MAX_LEN; };
+
+/** Autocomplete for a ship's word: pack words first, then common English words, all starting with what was typed. */
+function suggestions(w: View, i: number): { word: string; pack: boolean }[] {
+  const q = normaliseWord(ui.slots[i].word);
+  const used = new Set(ui.slots.filter((_, j) => j !== i).map((x) => normaliseWord(x.word)));
+  const fits = (x: string) => x.length >= MIN_LEN && x.length <= MAX_LEN && x !== q && !used.has(x) && x.startsWith(q);
+  const out = [...new Set(w.pack.ships.map((x) => normaliseWord(x.word)))].filter(fits).slice(0, q ? 5 : 8).map((word) => ({ word, pack: true }));
+  if (q && w.options.allowOwn) {
+    for (const c of COMMON) {
+      if (out.length >= 8) break;
+      if (fits(c) && !out.some((o) => o.word === c)) out.push({ word: c, pack: false });
+    }
+  }
+  return out;
+}
 const placing = (w: View) => w.options.placeMode === 'place';
 function placedShips(except = -1): Ship[] {
   return ui.slots.flatMap((s, i) => (s.placed && i !== except && slotOk(s) ? [{ word: normaliseWord(s.word), hintEn: s.hintEn, hintFr: s.hintFr, r: s.placed.r, c: s.placed.c, horiz: s.placed.horiz, own: false }] : []));
@@ -218,18 +237,22 @@ function setupPanels(w: View) {
   initSlots(w);
   const me = w.teams[w.me], foe = w.teams[other(w.me)];
   const fixed = w.options.wordsMode === 'random';
-  const used = new Set(ui.slots.map((s) => normaliseWord(s.word)));
+  const [lo, hi] = budgetRange(w.options.budget);
+  const total = fleetLetters(ui.slots.map((s) => ({ word: normaliseWord(s.word) })));
+  const budgetLine = fixed ? '' : `<p class="budget ${total >= lo && total <= hi ? 'ok' : ''}" role="status">${t('budgetNow', { n: total, min: lo, max: hi })}</p>`;
   const tools = placing(w) && !me.ready ? `<div class="slottools"><button class="btn" data-do="randomplace">${t('randomPlace')}</button><button class="btn" data-do="clear">${t('clear')}</button></div>` : '';
-  const left = `<h2>${t('yourShips')}</h2>${tools}<div class="slots">${ui.slots.map((s, i) => {
+  const left = `<h2>${t('yourShips')}</h2>${budgetLine}${tools}<div class="slots">${ui.slots.map((s, i) => {
     const ok = slotOk(s), word = normaliseWord(s.word);
     const inPack = w.pack.ships.find((x) => x.word === word);
     const status = !placing(w) ? '' : s.placed ? `<span style="color:var(--primary);display:inline-flex;gap:4px;align-items:center">${icon.check(14)}${t('placed')}</span>` : t('notPlaced');
     const tiles = ok ? `<div class="tiles">${[...word].map((ch) => `<span class="tile mine">${ch}</span>`).join('')}</div>` : '';
-    const picks = !fixed && !ok ? `<span class="muted" style="font-size:12px">${t('orPick')}</span><div class="pickers">${w.pack.ships.filter((x) => x.word.length === s.len && !used.has(x.word)).slice(0, 6).map((x) => `<button data-pick="${i}" data-word="${x.word}">${x.word}</button>`).join('')}</div>` : '';
-    return `<div class="slot ${i === ui.active ? 'active' : ''} ${ok ? '' : 'todo'}" data-slot="${i}" role="group" aria-label="${t('letters', { n: s.len })}">
-      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px"><span style="${ok ? '' : 'color:var(--target)'}">${t('letters', { n: s.len }).toUpperCase()}${ok ? ` · ${(inPack ? t('fromPack') : t('yourWord')).toUpperCase()}` : ''}</span><span>${status}</span></div>
-      ${fixed ? tiles : `<label class="field" style="letter-spacing:0"><span class="sr">${t('typeWord')}</span><input class="input" data-focus="w${i}" data-word-input="${i}" value="${esc(s.word)}" maxlength="${s.len}" placeholder="${t('typeWord')}" style="letter-spacing:.18em;font-weight:700;text-transform:uppercase" ${me.ready ? 'disabled' : ''}></label>
-        ${s.word && !ok ? `<span class="err">${t('needs', { n: s.len, m: normaliseWord(s.word).length })}</span>` : ''}${picks}`}
+    const sugg = !fixed && !me.ready && (!ok || i === ui.active) ? suggestions(w, i) : [];
+    const picks = sugg.length ? `<span class="muted" style="font-size:12px">${word ? t('startsWith', { q: word }) : t('orPick')}</span><div class="pickers">${sugg.map((x) => `<button class="${x.pack ? 'pk' : ''}" data-pick="${i}" data-word="${x.word}" ${x.pack ? `title="${t('packWord')}"` : ''}>${x.word}</button>`).join('')}</div>` : '';
+    const label = `${t('shipN', { n: i + 1 })}${ok ? ` · ${t('letters', { n: word.length })} · ${inPack ? t('fromPack') : t('yourWord')}` : ''}`;
+    return `<div class="slot ${i === ui.active ? 'active' : ''} ${ok ? '' : 'todo'}" data-slot="${i}" role="group" aria-label="${t('shipN', { n: i + 1 })}">
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);gap:8px"><span style="${ok ? '' : 'color:var(--target)'}">${label.toUpperCase()}</span><span>${status}</span></div>
+      ${fixed ? tiles : `<label class="field" style="letter-spacing:0"><span class="sr">${t('typeWord')}</span><input class="input" data-focus="w${i}" data-word-input="${i}" value="${esc(s.word)}" maxlength="${MAX_LEN}" placeholder="${t('typeWord')}" autocomplete="off" autocapitalize="characters" spellcheck="false" style="letter-spacing:.18em;font-weight:700;text-transform:uppercase" ${me.ready ? 'disabled' : ''}></label>
+        ${s.word && !ok ? `<span class="err">${t('tooShort')}</span>` : ''}${picks}`}
       ${ok && !inPack && !fixed && w.options.ownHints ? `<label class="field" style="letter-spacing:0"><span>${t('hintEn')}</span><input class="input" data-focus="h${i}" data-hint="${i}" value="${esc(s.hintEn)}" maxlength="120" ${me.ready ? 'disabled' : ''}></label>
         <label class="field" style="letter-spacing:0"><span>${t('hintFr')}</span><input class="input" data-focus="hf${i}" data-hintfr="${i}" value="${esc(s.hintFr)}" maxlength="120" ${me.ready ? 'disabled' : ''}></label>` : ''}
     </div>`;
@@ -256,6 +279,8 @@ function draftFleet(w: View): { fleet: Ship[]; error: string | null } {
   const fleet = ui.slots.map((s) => ({ word: normaliseWord(s.word), hintEn: s.hintEn, hintFr: s.hintFr, r: s.placed?.r ?? 0, c: s.placed?.c ?? 0, horiz: s.placed?.horiz ?? true, own: false }));
   if (new Set(fleet.map((f) => f.word)).size !== fleet.length) return { fleet, error: 'duplicate' };
   if (w.options.wordsMode === 'choose') {
+    const we = wordsError(fleet, w.options.budget);
+    if (we) return { fleet, error: we };
     for (const f of fleet) {
       const inPack = w.pack.ships.some((x) => x.word === f.word);
       if (!inPack && !w.options.allowOwn) return { fleet, error: 'not-in-pack' };
@@ -264,7 +289,7 @@ function draftFleet(w: View): { fleet: Ship[]; error: string | null } {
   }
   if (placing(w)) {
     if (ui.slots.some((s) => !s.placed)) return { fleet, error: 'count' };
-    const e = fleetError(fleet, w.options.touching);
+    const e = fleetError(fleet, w.options.touching, w.options.wordsMode === 'choose' ? w.options.budget : undefined);
     if (e) return { fleet, error: e };
   }
   return { fleet, error: null };
@@ -313,7 +338,7 @@ function fleetHtml(w: View) {
       <div class="tiles">${s.letters.map((l) => `<span class="tile ${s.sunk ? 'sunk' : l ? 'on' : ''}">${l ?? ''}</span>`).join('')}</div>
       <small class="muted">${hint}</small>${guess}</li>`;
   }).join('');
-  return `<h2>${t('enemyFleet')}</h2><ul class="list fleet">${items}</ul>`;
+  return `<h2>${t('enemyFleet')}</h2><p class="muted" style="font-size:13px;margin:0 0 4px">${t('fleetTotal', { n: w.enemyShips.reduce((a, s) => a + s.length, 0) })}</p><ul class="list fleet">${items}</ul>`;
 }
 
 function cardHtml(w: View) {
@@ -485,7 +510,7 @@ function render() {
 function floatToolsHtml() {
   const s = ui.slots[ui.active];
   const word = s && slotOk(s) ? normaliseWord(s.word) : '';
-  const label = word ? `${esc(word)}${s.placed ? ` ${icon.check(14)}` : ''}` : t('letters', { n: s?.len ?? 0 });
+  const label = word ? `${esc(word)}${s.placed ? ` ${icon.check(14)}` : ''}` : t('shipN', { n: ui.active + 1 });
   return `<span class="shipsel" role="group" aria-label="${t('yourShips')}">
       <button class="btn icon" data-do="prevship" aria-label="${t('prevShip')}">${icon.chevL()}</button>
       <button class="btn" data-do="editship" title="${t('editShip')}" aria-live="polite"><b class="${word ? '' : 'todo'}">${label}</b></button>
@@ -576,7 +601,7 @@ function setupTap(w: View, r: number, c: number) {
   if (placed >= 0) { ui.horiz = ui.slots[placed].placed!.horiz; ui.slots[placed].placed = null; ui.active = placed; ui.hover = [r, c]; render(); return; }
   const s = ui.slots[ui.active];
   if (!s) return;
-  if (!slotOk(s)) { toast(t('needWord', { n: s.len })); showSlot(ui.active); return; }
+  if (!slotOk(s)) { toast(t('needWord')); showSlot(ui.active); return; }
   // the selected ship is already on the board: tapping elsewhere moves it
   const before = s.placed;
   s.placed = null;
@@ -662,7 +687,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('input', (e) => {
   const el = e.target as HTMLInputElement;
   if (el.dataset.wordInput !== undefined) {
-    const i = +el.dataset.wordInput; ui.slots[i].word = normaliseWord(el.value).slice(0, ui.slots[i].len); ui.slots[i].placed = null;
+    const i = +el.dataset.wordInput; ui.slots[i].word = normaliseWord(el.value).slice(0, MAX_LEN); ui.slots[i].placed = null;
     const w = v(); const p = w?.pack.ships.find((x) => x.word === ui.slots[i].word);
     if (p) { ui.slots[i].hintEn = p.hintEn; ui.slots[i].hintFr = p.hintFr; }
     el.value = ui.slots[i].word; ui.active = i; render(); return;

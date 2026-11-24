@@ -21,6 +21,7 @@ export interface Options {
   allowOwn: boolean;
   ownHints: boolean;
   touching: boolean;
+  budget: string;     // total letters across the 5 ships, 'min-max', one of BUDGETS
 }
 
 export interface Ship {
@@ -92,7 +93,18 @@ export interface GameState {
   seq: number;              // increases on every change
 }
 
-export const FLEET = [6, 5, 4, 3, 3] as const;
+/** 5 ships; each word is 3 to 10 letters; the 5 words together must fit the letter budget the host picks. */
+export const SHIPS = 5;
+export const MIN_LEN = 3;
+export const MAX_LEN = 10;
+export const BUDGETS = ['18-24', '21-30', '25-35'] as const;
+export const DEFAULT_BUDGET = '21-30';
+export function budgetRange(b: string): [number, number] {
+  const m = /^(\d+)-(\d+)$/.exec(b || '');
+  return m ? [+m[1], +m[2]] : [21, 30];
+}
+/** Length patterns used for random words, so both teams get the same total. */
+export const RANDOM_PATTERNS: readonly (readonly number[])[] = [[6, 5, 4, 3, 3], [5, 4, 3, 3, 3], [7, 6, 5, 4, 3], [8, 7, 6, 5, 4]];
 export const LETTERS = 'ABCDEFGHIJ';
 export const key = (r: number, c: number) => `${r},${c}`;
 export const cellName = (r: number, c: number) => `${LETTERS[c]}${r + 1}`;

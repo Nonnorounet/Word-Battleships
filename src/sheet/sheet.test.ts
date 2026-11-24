@@ -28,7 +28,7 @@ describe('sheet', () => {
   });
   it('explains what is missing', () => {
     const [p] = packsFromCsv(grid, ships.split('\n').slice(0, 5).join('\n'), ch);
-    expect(packProblem(p)).toBe('1/2 ship words of 3 letters');
+    expect(packProblem(p)).toBe('4/5 ship words of 3 to 10 letters');
   });
   it('reads the id from a link', () => {
     expect(sheetId('https://docs.google.com/spreadsheets/d/1FTocqbtlV8p9xo8FZwJY4snjVw-LptKboBonSOdGrwQ/edit?usp=x')).toBe('1FTocqbtlV8p9xo8FZwJY4snjVw-LptKboBonSOdGrwQ');

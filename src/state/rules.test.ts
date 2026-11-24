@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import data from '../data/aerospace.json';
-import { apply, checkAnswer, fleetError, newGame, randomPlace, randomWords, SCORE, viewFor, type Action } from './rules';
+import { apply, checkAnswer, fleetError, newGame, randomPlace, randomWords, SCORE, viewFor, wordsError, type Action } from './rules';
 import type { GameState, Pack, Ship, TeamId } from './types';
 
 const pack = data.packs[0] as Pack;
@@ -63,8 +63,25 @@ describe('fleet', () => {
     expect(fleetError(f, false)).toBeNull();
     f[1].r = 0; expect(fleetError(f, true)).toBe('overlap');
     const g = fixedFleet(); g[0].c = 6; expect(fleetError(g, true)).toBe('outside');
-    const h = fixedFleet(); h[4].word = 'HUBS'; expect(fleetError(h, true)).toBe('lengths');
+    const h = fixedFleet(); h[4].word = 'HB'; expect(fleetError(h, true)).toBe('lengths');
+    const h2 = fixedFleet(); h2[4].word = 'HUBS'; expect(fleetError(h2, true)).toBeNull();
     const k = fixedFleet(); k[1].r = 1; expect(fleetError(k, false)).toBe('touching');
+  });
+  it('checks the letter budget', () => {
+    const f = fixedFleet(); // 6 + 5 + 4 + 3 + 3 = 21
+    expect(fleetError(f, true, '21-30')).toBeNull();
+    expect(fleetError(f, true, '25-35')).toBe('budget');
+    expect(wordsError([{ word: 'SATELLITES' }, { word: 'ROCKET' }, { word: 'ORBIT' }, { word: 'WING' }, { word: 'JET' }], '21-30')).toBeNull();
+    expect(wordsError([{ word: 'SATELLITESX' }, { word: 'ROCKET' }, { word: 'ORBIT' }, { word: 'WING' }, { word: 'JET' }])).toBe('lengths');
+  });
+  it('random words fit every budget', () => {
+    for (const b of ['18-24', '21-30', '25-35']) {
+      const [lo, hi] = b.split('-').map(Number);
+      for (let i = 0; i < 20; i++) {
+        const n = randomWords(pack, rnd, b).reduce((a, s) => a + s.word.length, 0);
+        expect(n).toBeGreaterThanOrEqual(lo); expect(n).toBeLessThanOrEqual(hi);
+      }
+    }
   });
   it('random + random skips setup', () => {
     let s = newGame('X', pack);

@@ -25,7 +25,8 @@ Files that come with this handoff:
 ### Setup
 - **Teams:** two teams, one device each, paired by a game code (e.g. `ORBIT-42`). The host device creates the game; the other device joins.
 - **Board:** 10×10. **Rows** are labelled 1–10 *and* carry a row word (usually a subject: "The client"). **Columns** are labelled A–J *and* carry a column word (usually a verb: "approve").
-- **Fleet:** 5 ships whose words are 6, 5, 4, 3 and 3 letters long (21 cells). A ship is as long as its word, one letter per cell, horizontal or vertical.
+- **Fleet:** 5 ships, each word 3 to 10 letters long. The 5 words together must fit a letter total the host picks in Options: 18–24, 21–30 (default) or 25–35. Random words use the same length pattern for both teams (6, 5, 4, 3, 3 when the total allows), so totals match. A ship is as long as its word, one letter per cell, horizontal or vertical. Both teams see the other fleet's total and each ship's length.
+- **Autocomplete:** while a team types a ship word, the game suggests words that start with those letters: pack words first, then common English words (SCOWL levels 10–35, bundled, offline). Choosing a non-pack word still needs a hint when that option is on.
 - **Options screen** (host only, before fleet setup):
   - Word pack: one of the packs in the Sheet.
   - Grammar focus: free text or a list, e.g. "Past simple". It is shown on every card.
