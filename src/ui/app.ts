@@ -219,7 +219,8 @@ function setupPanels(w: View) {
   const me = w.teams[w.me], foe = w.teams[other(w.me)];
   const fixed = w.options.wordsMode === 'random';
   const used = new Set(ui.slots.map((s) => normaliseWord(s.word)));
-  const left = `<h2>${t('yourShips')}</h2><div class="slots">${ui.slots.map((s, i) => {
+  const tools = placing(w) && !me.ready ? `<div class="slottools"><button class="btn" data-do="randomplace">${t('randomPlace')}</button><button class="btn" data-do="clear">${t('clear')}</button></div>` : '';
+  const left = `<h2>${t('yourShips')}</h2>${tools}<div class="slots">${ui.slots.map((s, i) => {
     const ok = slotOk(s), word = normaliseWord(s.word);
     const inPack = w.pack.ships.find((x) => x.word === word);
     const status = !placing(w) ? '' : s.placed ? `<span style="color:var(--primary);display:inline-flex;gap:4px;align-items:center">${icon.check(14)}${t('placed')}</span>` : t('notPlaced');
@@ -448,6 +449,7 @@ function render() {
   const cap = gameEl!.querySelector<HTMLElement>('.caption')!;
   const tools = gameEl!.querySelector<HTMLElement>('.stagetools')!;
   gameEl!.querySelector('.game')!.classList.toggle('showlog', ui.showLog);
+  gameEl!.querySelector('.game')!.classList.toggle('setup', w.phase === 'setup');
   if (w.phase === 'setup') {
     const p = setupPanels(w);
     patch(left, p.left); patch(right, p.right);
@@ -457,7 +459,7 @@ function render() {
     cap.textContent = t('yourWaters', { team: w.teams[other(w.me)].name });
     patch(tools, zoomTools(false) + (placing(w) ? '' : ''));
     const ft = gameEl!.querySelector<HTMLElement>('[data-floattools]')!;
-    patch(ft, placing(w) && !w.teams[w.me].ready ? `<button class="btn" data-do="rotate">${icon.rotate()}${t('rotate')}</button><button class="btn" data-do="randomplace">${t('randomPlace')}</button><button class="btn" data-do="clear">${t('clear')}</button>` : '');
+    patch(ft, placing(w) && !w.teams[w.me].ready ? floatToolsHtml() : '');
     ft.style.display = placing(w) && !w.teams[w.me].ready ? '' : 'none';
     gameEl!.querySelector<HTMLElement>('.panel.left')!.style.display = '';
   } else {
@@ -478,6 +480,25 @@ function render() {
   }
   updateBoard(w);
   tick();
+}
+
+function floatToolsHtml() {
+  const s = ui.slots[ui.active];
+  const word = s && slotOk(s) ? normaliseWord(s.word) : '';
+  const label = word ? `${esc(word)}${s.placed ? ` ${icon.check(14)}` : ''}` : t('letters', { n: s?.len ?? 0 });
+  return `<span class="shipsel" role="group" aria-label="${t('yourShips')}">
+      <button class="btn icon" data-do="prevship" aria-label="${t('prevShip')}">${icon.chevL()}</button>
+      <button class="btn" data-do="editship" title="${t('editShip')}" aria-live="polite"><b class="${word ? '' : 'todo'}">${label}</b></button>
+      <button class="btn icon" data-do="nextship" aria-label="${t('nextShip')}">${icon.chevR()}</button></span>
+    <button class="btn" data-do="rotate" title="${t('rotate')}">${icon.rotate()}${t('rotateShort')}<span class="long">&nbsp;(R)</span></button>`;
+}
+
+/** Bring a ship's card in the list into view (it sits below the board on phones) and focus its word field. */
+function showSlot(i: number) {
+  const el = document.querySelector<HTMLElement>(`[data-slot="${i}"]`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.querySelector<HTMLInputElement>('[data-word-input]:not(:disabled)')?.focus({ preventScroll: true });
 }
 
 function zoomTools(withToggle: boolean, own = false) {
@@ -554,10 +575,14 @@ function setupTap(w: View, r: number, c: number) {
   const placed = ui.slots.findIndex((s) => s.placed && slotOk(s) && shipCells({ word: normaliseWord(s.word), r: s.placed.r, c: s.placed.c, horiz: s.placed.horiz }).some(([a, b]) => a === r && b === c));
   if (placed >= 0) { ui.horiz = ui.slots[placed].placed!.horiz; ui.slots[placed].placed = null; ui.active = placed; ui.hover = [r, c]; render(); return; }
   const s = ui.slots[ui.active];
-  if (!s || !slotOk(s)) { toast(tErr('count')); return; }
+  if (!s) return;
+  if (!slotOk(s)) { toast(t('needWord', { n: s.len })); showSlot(ui.active); return; }
+  // the selected ship is already on the board: tapping elsewhere moves it
+  const before = s.placed;
+  s.placed = null;
   ui.hover = [r, c];
   const g = ghost(w);
-  if (!g || !g.valid) { toast(tErr(w.options.touching ? 'overlap' : 'touching')); return; }
+  if (!g || !g.valid) { s.placed = before; toast(tErr(w.options.touching ? 'overlap' : 'touching')); render(); return; }
   s.placed = { r, c, horiz: ui.horiz };
   const next = ui.slots.findIndex((x) => !x.placed);
   if (next >= 0) ui.active = next;
@@ -608,6 +633,9 @@ document.addEventListener('click', (e) => {
     case 'ready': { if (!w) break; const d = draftFleet(w); if (d.error) { toast(tErr(d.error)); break; } act({ a: 'fleet', fleet: d.fleet }); break; }
     case 'unready': act({ a: 'unready' }); break;
     case 'rotate': ui.horiz = !ui.horiz; render(); break;
+    case 'prevship': ui.active = (ui.active + ui.slots.length - 1) % ui.slots.length; render(); break;
+    case 'nextship': ui.active = (ui.active + 1) % ui.slots.length; render(); break;
+    case 'editship': showSlot(ui.active); break;
     case 'randomplace': if (w) { randomPlaceDraft(w); render(); } break;
     case 'clear': ui.slots.forEach((s) => (s.placed = null)); ui.active = 0; render(); break;
     case 'draw': if (ui.selected) act({ a: 'draw', r: ui.selected[0], c: ui.selected[1] }); break;

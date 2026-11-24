@@ -33,9 +33,10 @@ export const en = {
   typeWord: 'Type your own word', orPick: 'or pick from the pack', needs: 'Needs {n} letters ({m} so far)', hintEn: 'Hint (EN)', hintFr: 'Hint (FR, optional)',
   placed: 'placed', notPlaced: 'not placed', yourWaters: 'Your waters · {team} can’t see this',
   rotate: 'Rotate (R)', rotateShort: 'Rotate', randomPlace: 'Random placement', clear: 'Clear board',
+  prevShip: 'Previous ship', nextShip: 'Next ship', editShip: 'Edit this ship’s word', needWord: 'Type or pick a {n}-letter word for this ship first.',
   howTo: 'How to', setupStep1: 'Choose a word for each ship, or pick one from the pack.',
   setupStep2: 'Drag a ship onto the board. Press R or Rotate to turn it.',
-  setupStep3: 'On a tablet or phone: tap a ship, then tap its first cell.',
+  setupStep3: 'On a tablet or phone: choose the ship with ‹ › under the board, then tap its first cell. Tap a placed ship to move it.',
   setupStep4: 'Write a short English hint for each of your own words.',
   ready: 'Ready', notReady: 'Change my fleet', readyCount: '{n} of 5 ships placed', otherReady: '{team} is ready', otherSetup: '{team} is setting up its fleet',
   errors: {
@@ -100,9 +101,10 @@ export const fr: Strings = {
   typeWord: 'Saisissez votre mot', orPick: 'ou choisissez dans le pack', needs: 'Il faut {n} lettres ({m} pour l’instant)', hintEn: 'Indice (EN)', hintFr: 'Indice (FR, facultatif)',
   placed: 'placé', notPlaced: 'non placé', yourWaters: 'Vos eaux · {team} ne les voit pas',
   rotate: 'Pivoter (R)', rotateShort: 'Pivoter', randomPlace: 'Placement au hasard', clear: 'Vider le plateau',
+  prevShip: 'Navire précédent', nextShip: 'Navire suivant', editShip: 'Modifier le mot de ce navire', needWord: 'Saisissez ou choisissez d’abord un mot de {n} lettres pour ce navire.',
   howTo: 'Mode d’emploi', setupStep1: 'Choisissez un mot pour chaque navire, ou prenez-en un dans le pack.',
   setupStep2: 'Faites glisser un navire sur le plateau. Appuyez sur R ou Pivoter pour le tourner.',
-  setupStep3: 'Sur tablette ou téléphone : touchez un navire, puis sa première case.'.replace(' :', `${NB}:`),
+  setupStep3: 'Sur tablette ou téléphone : choisissez le navire avec ‹ › sous le plateau, puis touchez sa première case. Touchez un navire placé pour le déplacer.'.replace(' :', `${NB}:`),
   setupStep4: 'Écrivez un court indice en anglais pour chacun de vos mots.',
   ready: 'Prêts', notReady: 'Modifier ma flotte', readyCount: '{n} navires sur 5 placés', otherReady: '{team} est prête', otherSetup: '{team} place sa flotte',
   errors: {
