@@ -1,6 +1,6 @@
 {
   "name": "word-battleships",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "private": true,
   "description": "Word Battleships: a two-team English sentence game with a 3D board.",
   "author": "Nonnorounet",
